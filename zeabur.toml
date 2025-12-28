@@ -1,0 +1,23 @@
+# zeabur.toml - 量化交易系统配置
+# 从 Render 迁移到 Zeabur的完整配置
+# 支持无API密钥部署（仅获取公共行情数据）
+
+[[services]]
+name = "brain-core-trading"
+type = "python"
+
+[services.python]
+# Python版本（与Render保持一致）
+version = "3.11"
+# 构建命令：安装依赖
+build_command = "pip install -r requirements.txt"
+# 启动命令：运行主程序
+start_command = "python brain_core.py"
+
+[services.env]
+# Zeabur模式开关：自动跳过保活服务，无需代码改动
+IS_ZEABUR = { value = "true" }
+
+# 注：所有交易所API密钥变量均不声明required=true
+# 这样在Zeabur部署时不会强制要求填写
+# 如需添加真实密钥，后续在控制台手动添加即可
