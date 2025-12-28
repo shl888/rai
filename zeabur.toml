@@ -1,0 +1,4 @@
+[[services]]
+name = "brain-core-trading"
+type = "docker"  # ✅ 只需声明服务类型为docker
+# 其他配置（构建命令、启动命令、环境变量）全部默认
