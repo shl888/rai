@@ -97,10 +97,32 @@ async def get_system_status(request: web.Request) -> web.Response:
         }, status=500)
 
 
+async def get_pipeline_status(request: web.Request) -> web.Response:
+    """获取数据处理管道状态（公开访问）"""
+    try:
+        from shared_data.pipeline_manager import PipelineManager
+        
+        manager = PipelineManager()
+        status = manager.get_status()
+        
+        return web.json_response({
+            "success": True,
+            "data": status
+        })
+        
+    except Exception as e:
+        logger.error(f"获取管道状态失败: {e}")
+        return web.json_response({
+            "success": False,
+            "error": str(e)
+        }, status=500)
+
+
 def setup_monitor_routes(app: web.Application):
     """设置系统监控路由"""
     app.router.add_get('/api/monitor/health', get_system_health)
     app.router.add_get('/api/monitor/metrics', get_system_metrics)
     app.router.add_get('/api/monitor/status', get_system_status)
+    app.router.add_get('/api/pipeline/status', get_pipeline_status)
     
-    logger.info("✅ 监控路由已加载: /api/monitor/health, /api/monitor/metrics, /api/monitor/status")
+    logger.info("✅ 监控路由已加载: /api/monitor/health, /api/monitor/metrics, /api/monitor/status, /api/pipeline/status")
