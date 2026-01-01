@@ -1,19 +1,11 @@
-"""
-第二步：数据融合与统一规格
-功能：将Step1提取的5种数据源，按交易所+合约名合并成一条
-输出：每个交易所每个合约一条完整数据
-"""
-
 import logging
-from typing import Dict, List, Any, Optional, TYPE_CHECKING
+from typing import Dict, List, Any, Optional
 from collections import defaultdict
 from dataclasses import dataclass
-
-# 类型检查时导入，避免循环依赖
-if TYPE_CHECKING:
-    from step1_filter import ExtractedData
+from shared_data.pipeline_manager import PipelineManager
 
 logger = logging.getLogger(__name__)
+
 
 @dataclass 
 class FusedData:
@@ -23,20 +15,16 @@ class FusedData:
     contract_name: str
     latest_price: Optional[str] = None
     funding_rate: Optional[str] = None
-    last_settlement_time: Optional[int] = None      # 币安历史数据提供
-    current_settlement_time: Optional[int] = None   # 实时数据提供
-    next_settlement_time: Optional[int] = None      # OKX提供
+    last_settlement_time: Optional[int] = None
+    current_settlement_time: Optional[int] = None
+    next_settlement_time: Optional[int] = None
+
 
 class Step2Fusion:
     """第二步：数据融合"""
     
-    def __init__(self):
-        self.stats = defaultdict(int)
-    
-    def process(self, step1_results: List["ExtractedData"]) -> List[FusedData]:
-        """
-        处理Step1的提取结果，按交易所+合约名合并
-        """
+    def process(self, step1_results: List) -> List[FusedData]:
+        """处理Step1的提取结果，按交易所+合约名合并"""
         logger.info(f"开始融合 {len(step1_results)} 条Step1数据...")
         
         # 按 exchange + symbol 分组
@@ -54,17 +42,18 @@ class Step2Fusion:
                 fused = self._merge_group(items)
                 if fused:
                     results.append(fused)
-                    self.stats[fused.exchange] += 1
-                else:
-                    logger.debug(f"融合返回空结果: {key}")
             except Exception as e:
-                logger.error(f"融合失败: {key} - {e}", exc_info=True)
+                logger.error(f"融合失败: {key} - {e}")
                 continue
         
-        logger.info(f"Step2融合完成: {dict(self.stats)}")
+        logger.info(f"Step2融合完成: {len(results)} 个合约")
+        
+        # ✅ 通知PipelineManager当前处理结果（两行分开）
+        PipelineManager.instance().current_processing['step2'] = f"融合{len(results)}个合约"
+        
         return results
     
-    def _merge_group(self, items: List["ExtractedData"]) -> Optional[FusedData]:
+    def _merge_group(self, items: List) -> Optional[FusedData]:
         """合并同一组内的所有数据"""
         if not items:
             logger.debug("合并组接收空列表")
@@ -91,7 +80,7 @@ class Step2Fusion:
             logger.warning(f"未知交易所: {exchange}，跳过")
             return None
     
-    def _merge_okx(self, items: List["ExtractedData"], fused: FusedData) -> Optional[FusedData]:
+    def _merge_okx(self, items: List, fused: FusedData) -> Optional[FusedData]:
         """合并OKX数据：ticker + funding_rate"""
         
         for item in items:
@@ -122,7 +111,7 @@ class Step2Fusion:
         
         return fused
     
-    def _merge_binance(self, items: List["ExtractedData"], fused: FusedData) -> Optional[FusedData]:
+    def _merge_binance(self, items: List, fused: FusedData) -> Optional[FusedData]:
         """合并币安数据：核心是以mark_price为准"""
         
         # 第一步：找mark_price数据（必须有）

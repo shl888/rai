@@ -8,8 +8,10 @@ import logging
 from typing import Dict, List, Optional
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+from shared_data.pipeline_manager import PipelineManager
 
 logger = logging.getLogger(__name__)
+
 
 @dataclass
 class AlignedData:
@@ -18,31 +20,26 @@ class AlignedData:
     okx_contract_name: Optional[str] = None
     binance_contract_name: Optional[str] = None
     
-    # OKX数据
     okx_price: Optional[str] = None
     okx_funding_rate: Optional[str] = None
     okx_last_settlement: Optional[str] = None
     okx_current_settlement: Optional[str] = None
     okx_next_settlement: Optional[str] = None
     
-    # 币安数据
     binance_price: Optional[str] = None
     binance_funding_rate: Optional[str] = None
     binance_last_settlement: Optional[str] = None
     binance_current_settlement: Optional[str] = None
     binance_next_settlement: Optional[str] = None
     
-    # 时间戳备份（用于后续计算）
     okx_current_ts: Optional[int] = None
     okx_next_ts: Optional[int] = None
     binance_current_ts: Optional[int] = None
     binance_last_ts: Optional[int] = None
 
+
 class Step3Align:
     """第三步：双平台对齐 + 时间转换（修正版）"""
-    
-    def __init__(self):
-        self.stats = {"total_symbols": 0, "okx_only": 0, "binance_only": 0, "both_platforms": 0}
     
     def process(self, fused_results: List) -> List[AlignedData]:
         """处理Step2的融合结果"""
@@ -61,7 +58,12 @@ class Step3Align:
                 grouped[symbol]["binance"] = item
         
         # 统计
-        self.stats["total_symbols"] = len(grouped)
+        self.stats = {
+            "total_symbols": len(grouped),
+            "okx_only": 0,
+            "binance_only": 0,
+            "both_platforms": 0
+        }
         for symbol, data in grouped.items():
             if data["okx"] and data["binance"]:
                 self.stats["both_platforms"] += 1
@@ -85,6 +87,10 @@ class Step3Align:
                     continue
         
         logger.info(f"Step3完成: {len(results)} 个双平台合约")
+        
+        # ✅ 通知PipelineManager当前处理结果
+        PipelineManager.instance().current_processing['step3'] = f"对齐{len(results)}个双平台合约"
+        
         return results
     
     def _align_item(self, symbol: str, okx_item, binance_item) -> Optional[AlignedData]:

@@ -2,13 +2,14 @@
 """
 PipelineManager 终极降压版 - 流式处理 + 零缓存 + 无队列
 内存占用：<100MB，适合512MB实例
+日志改造：零积累，每10分钟显示当前处理状态
 """
 
 import asyncio
 from enum import Enum
 from typing import Dict, Any, Optional, Callable
 import logging
-import time  # ✅ 修复：必须导入
+import time
 
 # 5个步骤
 from shared_data.step1_filter import Step1Filter
@@ -62,8 +63,18 @@ class PipelineManager:
             'market_processed': 0,
             'account_processed': 0,
             'errors': 0,
-            'start_time': time.time()  # ✅ 现在time已导入
+            'start_time': time.time()
         }
+        
+        # ✅ 零积累日志：只存当前处理批次的摘要
+        self.current_processing = {
+            'step1': None,
+            'step2': None,
+            'step3': None,
+            'step4': None,
+            'step5': None
+        }
+        self.log_lock = asyncio.Lock()
         
         self.running = False
         
@@ -81,6 +92,19 @@ class PipelineManager:
         # 流式版：不需要消费者循环，数据来时直接处理
         
         logger.info("✅ 流式处理已就绪（来一条处理一条）")
+        
+        # ✅ 启动时打印5步状态
+        logger.info("=" * 60)
+        logger.info("🚀 流水线5步启动状态：")
+        logger.info(f"  Step1-Filter: {'✅ 已加载' if self.step1 else '❌ 失败'}")
+        logger.info(f"  Step2-Fusion: {'✅ 已加载' if self.step2 else '❌ 失败'}")
+        logger.info(f"  Step3-Align: {'✅ 已加载' if self.step3 else '❌ 失败'}")
+        logger.info(f"  Step4-Calc: {'✅ 已加载' if self.step4 else '❌ 失败'}")
+        logger.info(f"  Step5-CrossCalc: {'✅ 已加载' if self.step5 else '❌ 失败'}")
+        logger.info("=" * 60)
+        
+        # ✅ 启动10分钟定时器
+        asyncio.create_task(self._batch_log_timer())
     
     async def stop(self):
         """停止"""
@@ -163,6 +187,17 @@ class PipelineManager:
         
         self.counters['account_processed'] += 1
         logger.debug(f"💰 账户数据直达: {data.get('exchange', 'N/A')}")
+    
+    async def _batch_log_timer(self):
+        """每10分钟打印一次当前处理状态，立即清空"""
+        while self.running:
+            await asyncio.sleep(600)  # 10分钟
+            async with self.log_lock:
+                # 打印当前处理信息（如果有）
+                for step, info in self.current_processing.items():
+                    if info:
+                        logger.info(f"📊 流水线{step} - 当前处理: {info}")
+                        self.current_processing[step] = None  # 立即清空！
     
     def get_status(self) -> Dict[str, Any]:
         uptime = time.time() - self.counters['start_time']

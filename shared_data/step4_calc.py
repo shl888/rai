@@ -9,8 +9,10 @@ from typing import Dict, List, Optional, Any
 from dataclasses import dataclass
 from collections import defaultdict
 import time
+from shared_data.pipeline_manager import PipelineManager
 
 logger = logging.getLogger(__name__)
+
 
 @dataclass
 class PlatformData:
@@ -37,11 +39,14 @@ class PlatformData:
     period_seconds: Optional[int] = None
     countdown_seconds: Optional[int] = None
 
+
 class Step4Calc:
     """第四步：单平台计算"""
     
     def __init__(self):
+        # 币安时间滚动缓存
         self.binance_cache = {}
+        # 统计（临时，不累积）
         self.stats = defaultdict(int)
     
     def process(self, aligned_results: List) -> List[PlatformData]:
@@ -67,6 +72,10 @@ class Step4Calc:
         
         logger.info(f"Step4计算完成: {len(results)} 条单平台数据")
         logger.info(f"币安时间滚动统计: {dict(self.stats)}")
+        
+        # ✅ 通知PipelineManager当前处理结果
+        PipelineManager.instance().current_processing['step4'] = f"计算{len(results)}条单平台数据"
+        
         return results
     
     def _calc_okx(self, aligned_item) -> Optional[PlatformData]:

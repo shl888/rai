@@ -11,8 +11,10 @@ from dataclasses import dataclass, field
 from collections import defaultdict
 from datetime import datetime
 import traceback
+from shared_data.pipeline_manager import PipelineManager
 
 logger = logging.getLogger(__name__)
+
 
 @dataclass
 class CrossPlatformData:
@@ -62,6 +64,7 @@ class CrossPlatformData:
             self.metadata["price_validation"] = "valid" if okx_price > 0 and binance_price > 0 else "invalid"
         except:
             self.metadata["price_validation"] = "error"
+
 
 class Step5CrossCalc:
     """第五步：跨平台计算（专注数据计算版）"""
@@ -122,6 +125,9 @@ class Step5CrossCalc:
         
         logger.info(f"Step5完成: 成功 {self.stats['successful']}/{self.stats['total_processed']}")
         logger.info(f"统计详情: {self.stats}")
+        
+        # ✅ 通知PipelineManager当前处理结果
+        PipelineManager.instance().current_processing['step5'] = f"跨平台计算{len(results)}个合约"
         
         return results
     

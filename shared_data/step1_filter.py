@@ -2,6 +2,7 @@ import logging
 from typing import Dict, List, Any, Optional
 from collections import defaultdict
 from dataclasses import dataclass
+from shared_data.pipeline_manager import PipelineManager  # ✅ 顶部导入
 
 logger = logging.getLogger(__name__)
 
@@ -21,8 +22,6 @@ class Step1Filter:
         "binance_funding_settlement": {"path": [], "fields": {"contract_name": "symbol", "funding_rate": "funding_rate", "last_settlement_time": "funding_time"}}
     }
     
-    def __init__(self):
-        self.stats = defaultdict(int)
     
     def process(self, raw_items: List[Dict[str, Any]]) -> List[ExtractedData]:
         logger.info(f"开始处理 {len(raw_items)} 条原始数据...")
@@ -32,11 +31,13 @@ class Step1Filter:
                 extracted = self._extract_item(item)
                 if extracted:
                     results.append(extracted)
-                    self.stats[extracted.data_type] += 1
             except Exception as e:
                 logger.error(f"提取失败: {item.get('exchange')}.{item.get('symbol')} - {e}")
                 continue
-        logger.info(f"Step1过滤完成: {dict(self.stats)}")
+        
+        # ✅ 通知PipelineManager（不统计，只存当前值）
+        PipelineManager.instance().current_processing['step1'] = f"过滤{len(results)}条数据"
+        
         return results
     
     def _traverse_path(self, data: Any, path: List[Any]) -> Any:
