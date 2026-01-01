@@ -8,6 +8,7 @@ import logging
 from typing import Dict, List, Optional
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+import time  # 新增：用于频率控制
 
 logger = logging.getLogger(__name__)
 
@@ -43,10 +44,24 @@ class Step3Align:
     
     def __init__(self):
         self.stats = {"total_symbols": 0, "okx_only": 0, "binance_only": 0, "both_platforms": 0}
+        # 新增：频率控制相关
+        self.last_log_time = 0
+        self.log_interval = 600  # 10分钟 = 600秒
+        logger.info(f"✅ Step3Align 初始化成功（日志频率：10分钟/次）")
+    
+    def _should_log(self) -> bool:
+        """检查是否应该输出日志（频率控制）"""
+        current_time = time.time()
+        if current_time - self.last_log_time >= self.log_interval:
+            self.last_log_time = current_time
+            return True
+        return False
     
     def process(self, fused_results: List) -> List[AlignedData]:
         """处理Step2的融合结果"""
-        logger.info(f"开始对齐 {len(fused_results)} 条融合数据...")
+        # 新增：运行状态日志（带频率控制）
+        if self._should_log():
+            logger.info(f"🚀 Step3Align 开始处理 {len(fused_results)} 条融合数据...")
         
         # 按symbol分组
         grouped = {}
@@ -70,7 +85,9 @@ class Step3Align:
             elif data["binance"]:
                 self.stats["binance_only"] += 1
         
-        logger.info(f"合约统计: {self.stats}")
+        # 新增：统计信息日志（带频率控制）
+        if self._should_log():
+            logger.info(f"📊 Step3Align 合约统计: {self.stats}")
         
         # 只保留双平台都有的合约
         results = []
@@ -84,7 +101,10 @@ class Step3Align:
                     logger.error(f"对齐失败: {symbol} - {e}")
                     continue
         
-        logger.info(f"Step3完成: {len(results)} 个双平台合约")
+        # 新增：完成状态日志（带频率控制）
+        if self._should_log():
+            logger.info(f"✅ Step3Align 处理完成: {len(results)} 个双平台合约")
+        
         return results
     
     def _align_item(self, symbol: str, okx_item, binance_item) -> Optional[AlignedData]:

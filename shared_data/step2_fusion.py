@@ -8,6 +8,7 @@ import logging
 from typing import Dict, List, Any, Optional, TYPE_CHECKING
 from collections import defaultdict
 from dataclasses import dataclass
+import time  # 新增：用于频率控制
 
 # 类型检查时导入，避免循环依赖
 if TYPE_CHECKING:
@@ -32,12 +33,26 @@ class Step2Fusion:
     
     def __init__(self):
         self.stats = defaultdict(int)
+        # 新增：频率控制相关
+        self.last_log_time = 0
+        self.log_interval = 600  # 10分钟 = 600秒
+        logger.info(f"✅ Step2Fusion 初始化成功（日志频率：10分钟/次）")
+    
+    def _should_log(self) -> bool:
+        """检查是否应该输出日志（频率控制）"""
+        current_time = time.time()
+        if current_time - self.last_log_time >= self.log_interval:
+            self.last_log_time = current_time
+            return True
+        return False
     
     def process(self, step1_results: List["ExtractedData"]) -> List[FusedData]:
         """
         处理Step1的提取结果，按交易所+合约名合并
         """
-        logger.info(f"开始融合 {len(step1_results)} 条Step1数据...")
+        # 新增：运行状态日志（带频率控制）
+        if self._should_log():
+            logger.info(f"🚀 Step2Fusion 开始处理 {len(step1_results)} 条Step1数据...")
         
         # 按 exchange + symbol 分组
         grouped = defaultdict(list)
@@ -45,7 +60,9 @@ class Step2Fusion:
             key = f"{item.exchange}_{item.symbol}"
             grouped[key].append(item)
         
-        logger.info(f"检测到 {len(grouped)} 个不同的交易所合约")
+        # 新增：分组统计日志（带频率控制）
+        if self._should_log():
+            logger.info(f"📊 Step2Fusion 检测到 {len(grouped)} 个不同的交易所合约")
         
         # 合并每组数据
         results = []
@@ -61,7 +78,10 @@ class Step2Fusion:
                 logger.error(f"融合失败: {key} - {e}", exc_info=True)
                 continue
         
-        logger.info(f"Step2融合完成: {dict(self.stats)}")
+        # 新增：完成状态日志（带频率控制）
+        if self._should_log():
+            logger.info(f"✅ Step2Fusion 处理完成: {dict(self.stats)}")
+        
         return results
     
     def _merge_group(self, items: List["ExtractedData"]) -> Optional[FusedData]:

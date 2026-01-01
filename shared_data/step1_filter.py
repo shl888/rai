@@ -2,6 +2,7 @@ import logging
 from typing import Dict, List, Any, Optional
 from collections import defaultdict
 from dataclasses import dataclass
+import time  # 新增：用于频率控制
 
 logger = logging.getLogger(__name__)
 
@@ -23,9 +24,25 @@ class Step1Filter:
     
     def __init__(self):
         self.stats = defaultdict(int)
+        # 新增：频率控制相关
+        self.last_log_time = 0
+        self.log_interval = 600  # 10分钟 = 600秒
+        logger.info(f"✅ Step1Filter 初始化成功（日志频率：10分钟/次）")
+    
+    def _should_log(self) -> bool:
+        """检查是否应该输出日志（频率控制）"""
+        current_time = time.time()
+        if current_time - self.last_log_time >= self.log_interval:
+            self.last_log_time = current_time
+            return True
+        return False
     
     def process(self, raw_items: List[Dict[str, Any]]) -> List[ExtractedData]:
-        logger.info(f"开始处理 {len(raw_items)} 条原始数据...")
+        """提取数据并控制日志频率"""
+        # 新增：运行状态日志（带频率控制）
+        if self._should_log():
+            logger.info(f"🚀 Step1Filter 开始处理 {len(raw_items)} 条原始数据...")
+        
         results = []
         for item in raw_items:
             try:
@@ -36,7 +53,11 @@ class Step1Filter:
             except Exception as e:
                 logger.error(f"提取失败: {item.get('exchange')}.{item.get('symbol')} - {e}")
                 continue
-        logger.info(f"Step1过滤完成: {dict(self.stats)}")
+        
+        # 新增：完成状态日志（带频率控制）
+        if self._should_log():
+            logger.info(f"✅ Step1Filter 处理完成: {dict(self.stats)}")
+        
         return results
     
     def _traverse_path(self, data: Any, path: List[Any]) -> Any:

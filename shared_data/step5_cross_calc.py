@@ -10,6 +10,7 @@ from typing import Dict, List, Optional, Any
 from dataclasses import dataclass, field
 from collections import defaultdict
 from datetime import datetime
+import time  # 新增：用于频率控制
 import traceback
 
 logger = logging.getLogger(__name__)
@@ -80,6 +81,18 @@ class Step5CrossCalc:
             "start_time": None,
             "end_time": None
         }
+        # 新增：频率控制相关
+        self.last_log_time = 0
+        self.log_interval = 600  # 10分钟 = 600秒
+        logger.info(f"✅ Step5CrossCalc 初始化成功（日志频率：10分钟/次）")
+    
+    def _should_log(self) -> bool:
+        """检查是否应该输出日志（频率控制）"""
+        current_time = time.time()
+        if current_time - self.last_log_time >= self.log_interval:
+            self.last_log_time = current_time
+            return True
+        return False
     
     def process(self, platform_results: List) -> List[CrossPlatformData]:
         """
@@ -87,7 +100,10 @@ class Step5CrossCalc:
         """
         self.stats["start_time"] = datetime.now().isoformat()
         self.stats["total_processed"] = len(platform_results)
-        logger.info(f"开始跨平台计算 {len(platform_results)} 条单平台数据...")
+        
+        # 新增：运行状态日志（带频率控制）
+        if self._should_log():
+            logger.info(f"🚀 Step5CrossCalc 开始处理 {len(platform_results)} 条单平台数据...")
         
         if not platform_results:
             logger.warning("⚠️ 输入数据为空")
@@ -100,7 +116,9 @@ class Step5CrossCalc:
             if self._is_basic_valid(item):
                 grouped[item.symbol].append(item)
         
-        logger.info(f"检测到 {len(grouped)} 个不同合约")
+        # 新增：分组统计日志（带频率控制）
+        if self._should_log():
+            logger.info(f"📊 Step5CrossCalc 检测到 {len(grouped)} 个不同合约")
         
         # 合并每个合约的OKX和币安数据
         results = []
@@ -120,8 +138,10 @@ class Step5CrossCalc:
         
         self.stats["end_time"] = datetime.now().isoformat()
         
-        logger.info(f"Step5完成: 成功 {self.stats['successful']}/{self.stats['total_processed']}")
-        logger.info(f"统计详情: {self.stats}")
+        # 新增：完成状态日志（带频率控制）
+        if self._should_log():
+            logger.info(f"✅ Step5CrossCalc 处理完成: 成功 {self.stats['successful']}/{self.stats['total_processed']}")
+            logger.info(f"📈 Step5CrossCalc 统计详情: {self.stats}")
         
         return results
     

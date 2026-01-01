@@ -43,12 +43,26 @@ class Step4Calc:
     def __init__(self):
         self.binance_cache = {}
         self.stats = defaultdict(int)
+        # 新增：频率控制相关
+        self.last_log_time = 0
+        self.log_interval = 600  # 10分钟 = 600秒
+        logger.info(f"✅ Step4Calc 初始化成功（日志频率：10分钟/次）")
+    
+    def _should_log(self) -> bool:
+        """检查是否应该输出日志（频率控制）"""
+        current_time = time.time()
+        if current_time - self.last_log_time >= self.log_interval:
+            self.last_log_time = current_time
+            return True
+        return False
     
     def process(self, aligned_results: List) -> List[PlatformData]:
         """
         处理Step3的对齐数据
         """
-        logger.info(f"开始单平台计算 {len(aligned_results)} 个合约...")
+        # 新增：运行状态日志（带频率控制）
+        if self._should_log():
+            logger.info(f"🚀 Step4Calc 开始处理 {len(aligned_results)} 个合约...")
         
         results = []
         for item in aligned_results:
@@ -65,8 +79,11 @@ class Step4Calc:
                 logger.error(f"计算失败: {item.symbol} - {e}")
                 continue
         
-        logger.info(f"Step4计算完成: {len(results)} 条单平台数据")
-        logger.info(f"币安时间滚动统计: {dict(self.stats)}")
+        # 新增：完成状态日志（带频率控制）
+        if self._should_log():
+            logger.info(f"✅ Step4Calc 处理完成: {len(results)} 条单平台数据")
+            logger.info(f"📈 Step4Calc 币安时间滚动统计: {dict(self.stats)}")
+        
         return results
     
     def _calc_okx(self, aligned_item) -> Optional[PlatformData]:
